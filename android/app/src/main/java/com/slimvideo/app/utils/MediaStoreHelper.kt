@@ -29,9 +29,9 @@ object MediaStoreHelper {
         sourceFile: File,
         baseName: String
     ): Uri = withContext(Dispatchers.IO) {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val cleanBase = baseName.substringBeforeLast(".").take(24).replace(Regex("[^a-zA-Z0-9_]"), "_")
-        val displayName = "SlimVideo_${cleanBase}_$timeStamp.mp4"
+        val originalBase = baseName.substringBeforeLast(".").replace(Regex("[/\\\\:*?\"<>|]"), "_").ifBlank { "video" }
+        val uniqueSuffix = (1..99).random()
+        val displayName = "${originalBase}_slim_${uniqueSuffix}.mp4"
 
         val resolver = context.contentResolver
 

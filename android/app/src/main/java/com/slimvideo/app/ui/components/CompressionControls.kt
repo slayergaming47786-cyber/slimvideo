@@ -3,7 +3,9 @@ package com.slimvideo.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -35,8 +37,38 @@ fun CompressionControls(
     var selectedPreset by remember { mutableStateOf(CompressionPreset.AUTO) }
     var targetSizeMB by remember { mutableFloatStateOf(10f) }
 
-    val config = remember(metadata, selectedPreset, targetSizeMB) {
-        VideoAnalyzer.getPresetConfig(metadata, selectedPreset, targetSizeMB.toInt())
+    // Custom Mode states
+    var customMaxDim by remember { mutableIntStateOf(1280) } // 0 = original, 1920, 1280, 960, 854
+    var customVideoBitrateKbps by remember { mutableFloatStateOf(450f) }
+    var customFps by remember { mutableIntStateOf(30) }
+    var customAudioBitrateKbps by remember { mutableIntStateOf(64) }
+
+    val config = remember(
+        metadata,
+        selectedPreset,
+        targetSizeMB,
+        customMaxDim,
+        customVideoBitrateKbps,
+        customFps,
+        customAudioBitrateKbps
+    ) {
+        if (selectedPreset == CompressionPreset.CUSTOM) {
+            val (w, h) = if (customMaxDim == 0) {
+                Pair(VideoAnalyzer.makeEven(metadata.width), VideoAnalyzer.makeEven(metadata.height))
+            } else {
+                VideoAnalyzer.calculateScaledDimensions(metadata.width, metadata.height, customMaxDim)
+            }
+            CompressionConfig(
+                preset = CompressionPreset.CUSTOM,
+                targetWidth = w,
+                targetHeight = h,
+                targetVideoBitrateBps = (customVideoBitrateKbps * 1000).toInt(),
+                targetAudioBitrateBps = customAudioBitrateKbps * 1000,
+                targetFps = customFps
+            )
+        } else {
+            VideoAnalyzer.getPresetConfig(metadata, selectedPreset, targetSizeMB.toInt())
+        }
     }
 
     val estimatedBytes = remember(config, metadata) {
@@ -101,6 +133,14 @@ fun CompressionControls(
                 isSelected = selectedPreset == CompressionPreset.TARGET_SIZE,
                 onClick = { selectedPreset = CompressionPreset.TARGET_SIZE }
             )
+
+            PresetOptionCard(
+                preset = CompressionPreset.CUSTOM,
+                title = "⚙️ Custom Settings",
+                description = "Customize bitrate, resolution, FPS & audio quality",
+                isSelected = selectedPreset == CompressionPreset.CUSTOM,
+                onClick = { selectedPreset = CompressionPreset.CUSTOM }
+            )
         }
 
         // Target Size Slider (Only shown when Target Size is selected)
@@ -156,7 +196,192 @@ fun CompressionControls(
             }
         }
 
-        // Estimated Output Stats Box
+        // Custom Settings Panel (Only shown when Custom is selected)
+        if (selectedPreset == CompressionPreset.CUSTOM) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(DarkSurfaceVariant)
+                    .border(1.dp, PurpleAccent.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Header
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = PurpleAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Custom Compression Controls",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // 1. Resolution Selection
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "Target Resolution", color = TextSecondary, fontSize = 12.sp)
+                            Text(
+                                text = "${config.targetWidth}×${config.targetHeight}",
+                                color = CyanAccent,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            ResolutionChip(
+                                label = "Original",
+                                isSelected = customMaxDim == 0,
+                                onClick = { customMaxDim = 0 }
+                            )
+                            ResolutionChip(
+                                label = "1080p FHD",
+                                isSelected = customMaxDim == 1920,
+                                onClick = { customMaxDim = 1920 }
+                            )
+                            ResolutionChip(
+                                label = "720p HD",
+                                isSelected = customMaxDim == 1280,
+                                onClick = { customMaxDim = 1280 }
+                            )
+                            ResolutionChip(
+                                label = "540p",
+                                isSelected = customMaxDim == 960,
+                                onClick = { customMaxDim = 960 }
+                            )
+                            ResolutionChip(
+                                label = "480p",
+                                isSelected = customMaxDim == 854,
+                                onClick = { customMaxDim = 854 }
+                            )
+                        }
+                    }
+
+                    // 2. Video Bitrate Slider
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Video Bitrate", color = TextSecondary, fontSize = 12.sp)
+                            Text(
+                                text = if (customVideoBitrateKbps >= 1000f) {
+                                    String.format(java.util.Locale.US, "%.1f Mbps", customVideoBitrateKbps / 1000f)
+                                } else {
+                                    "${customVideoBitrateKbps.toInt()} kbps"
+                                },
+                                color = CyanAccent,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Slider(
+                            value = customVideoBitrateKbps,
+                            onValueChange = { customVideoBitrateKbps = it },
+                            valueRange = 100f..4000f,
+                            steps = 77,
+                            colors = SliderDefaults.colors(
+                                thumbColor = CyanAccent,
+                                activeTrackColor = CyanAccent,
+                                inactiveTrackColor = BorderColor
+                            )
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "100 kbps (Max compression)", color = TextMuted, fontSize = 10.sp)
+                            Text(text = "4000 kbps (High bitrate)", color = TextMuted, fontSize = 10.sp)
+                        }
+                    }
+
+                    // 3. Frame Rate (FPS)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = "Frame Rate (FPS)", color = TextSecondary, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FpsChip(
+                                label = "24 FPS (Cinema)",
+                                isSelected = customFps == 24,
+                                onClick = { customFps = 24 },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FpsChip(
+                                label = "30 FPS (Standard)",
+                                isSelected = customFps == 30,
+                                onClick = { customFps = 30 },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FpsChip(
+                                label = "60 FPS (Smooth)",
+                                isSelected = customFps == 60,
+                                onClick = { customFps = 60 },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // 4. Audio Quality
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = "Audio Quality", color = TextSecondary, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FpsChip(
+                                label = "48 kbps",
+                                isSelected = customAudioBitrateKbps == 48,
+                                onClick = { customAudioBitrateKbps = 48 },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FpsChip(
+                                label = "64 kbps",
+                                isSelected = customAudioBitrateKbps == 64,
+                                onClick = { customAudioBitrateKbps = 64 },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FpsChip(
+                                label = "96 kbps",
+                                isSelected = customAudioBitrateKbps == 96,
+                                onClick = { customAudioBitrateKbps = 96 },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FpsChip(
+                                label = "128 kbps",
+                                isSelected = customAudioBitrateKbps == 128,
+                                onClick = { customAudioBitrateKbps = 128 },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Estimated Output Stats Box (Real-time update)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,7 +408,7 @@ fun CompressionControls(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${config.targetWidth}×${config.targetHeight} @ ${config.targetFps}fps",
+                        text = "${config.targetWidth}×${config.targetHeight} @ ${config.targetFps}fps • ${(config.targetVideoBitrateBps / 1000)} kbps",
                         color = TextMuted,
                         fontSize = 11.sp
                     )
@@ -312,5 +537,62 @@ private fun PresetOptionCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ResolutionChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) CyanAccent else DarkSurface)
+            .border(
+                1.dp,
+                if (isSelected) CyanAccent else BorderColor,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (isSelected) DarkBackground else TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun FpsChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) PurpleAccent else DarkSurface)
+            .border(
+                1.dp,
+                if (isSelected) PurpleAccent else BorderColor,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (isSelected) Color.White else TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
     }
 }

@@ -1,0 +1,31 @@
+{
+  "name": "compression",
+  "version": "1.0.0",
+  "description": "Smart, Ultra-fast, 100% Offline Video Compressor PWA",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.73.0",
+    "mediabunny": "^1.66.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react-swc": "^4.3.3",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.7.0",
+    "vite": "^8.3.8"
+  }
+}

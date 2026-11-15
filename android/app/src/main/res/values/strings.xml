@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SlimVideo</string>
+    <string name="title_activity_main">SlimVideo</string>
+    <string name="package_name">com.slimvideo.app</string>
+    <string name="custom_url_scheme">com.slimvideo.app</string>
+</resources>

@@ -36,37 +36,43 @@ object MediaStoreHelper {
         val resolver = context.contentResolver
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
-                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SlimVideo")
-                put(MediaStore.Video.Media.IS_PENDING, 1)
-                put(MediaStore.Video.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
-                put(MediaStore.Video.Media.DATE_TAKEN, System.currentTimeMillis())
-            }
-
-            val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            val uri = resolver.insert(collection, contentValues)
-                ?: throw IllegalStateException("Failed to create MediaStore record")
-
             try {
-                resolver.openOutputStream(uri)?.use { outputStream ->
-                    FileInputStream(sourceFile).use { inputStream ->
-                        inputStream.copyTo(outputStream)
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
+                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                    put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SlimVideo")
+                    put(MediaStore.Video.Media.IS_PENDING, 1)
+                    put(MediaStore.Video.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
+                    put(MediaStore.Video.Media.DATE_TAKEN, System.currentTimeMillis())
+                }
+
+                val collection = try {
+                    MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                } catch (_: Exception) {
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                }
+
+                val uri = resolver.insert(collection, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { outputStream ->
+                        FileInputStream(sourceFile).use { inputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
                     }
-                } ?: throw IllegalStateException("Cannot open output stream for MediaStore Uri")
 
-                contentValues.clear()
-                contentValues.put(MediaStore.Video.Media.IS_PENDING, 0)
-                resolver.update(uri, contentValues, null, null)
+                    contentValues.clear()
+                    contentValues.put(MediaStore.Video.Media.IS_PENDING, 0)
+                    resolver.update(uri, contentValues, null, null)
 
-                return@withContext uri
+                    return@withContext uri
+                }
             } catch (e: Exception) {
-                resolver.delete(uri, null, null)
-                throw e
+                // MediaStore insert failed, continue to standard public storage fallback
             }
-        } else {
-            // Android 9 and below
+        }
+
+        // Standard public storage fallback for Android 9 or if MediaStore insert failed
+        try {
             val moviesDir = File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
                 "SlimVideo"
@@ -81,16 +87,25 @@ object MediaStoreHelper {
             }
 
             // Trigger Media Scanner so it appears instantly in gallery
-            var scannedUri: Uri? = null
             MediaScannerConnection.scanFile(
                 context,
                 arrayOf(targetFile.absolutePath),
-                arrayOf("video/mp4")
-            ) { _, uri ->
-                scannedUri = uri
-            }
+                arrayOf("video/mp4"),
+                null
+            )
 
-            return@withContext scannedUri ?: Uri.fromFile(targetFile)
+            return@withContext FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                targetFile
+            )
+        } catch (_: Exception) {
+            // Absolute fallback to internal cache FileProvider
+            return@withContext FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                sourceFile
+            )
         }
     }
 

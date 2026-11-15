@@ -83,5 +83,5 @@ sealed interface AppState {
     data class Ready(val metadata: VideoMetadata) : AppState
     data class Compressing(val metadata: VideoMetadata, val progress: CompressionProgress) : AppState
     data class Completed(val result: CompressionResult) : AppState
-    data class Error(val message: String, val canRetry: Boolean = true) : AppState
+    data class Error(val message: String, val lastMetadata: VideoMetadata? = null) : AppState
 }

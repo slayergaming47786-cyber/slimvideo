@@ -30,7 +30,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = AppState.Ready(metadata)
             } catch (e: Exception) {
                 _state.value = AppState.Error(
-                    e.message ?: "Failed to read video file. Please ensure it is a valid video."
+                    message = e.message ?: "Failed to read video file. Please ensure it is a valid video format."
                 )
             }
         }
@@ -66,7 +66,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value = AppState.Ready(metadata)
                 } else {
                     _state.value = AppState.Error(
-                        e.message ?: "Video compression failed. Please check device hardware encoder."
+                        message = e.message ?: "Video compression failed. Please check device hardware encoder.",
+                        lastMetadata = metadata
                     )
                 }
             }
@@ -79,6 +80,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _state.value
         if (current is AppState.Compressing) {
             _state.value = AppState.Ready(current.metadata)
+        } else {
+            _state.value = AppState.Idle
+        }
+    }
+
+    fun retry() {
+        val current = _state.value
+        if (current is AppState.Error && current.lastMetadata != null) {
+            _state.value = AppState.Ready(current.lastMetadata)
         } else {
             _state.value = AppState.Idle
         }

@@ -203,7 +203,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     textAlign = TextAlign.Center
                                 )
                                 Button(
-                                    onClick = { viewModel.reset() },
+                                    onClick = { viewModel.retry() },
                                     colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {

@@ -14,11 +14,59 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 object MediaStoreHelper {
+
+    /**
+     * Resolves unique output file name strictly formatted as:
+     * <original_name>-1.mp4, <original_name>-2.mp4, etc.
+     */
+    private fun resolveUniqueDisplayName(context: Context, originalBase: String): String {
+        val resolver = context.contentResolver
+        val projection = arrayOf(MediaStore.Video.Media._ID)
+        val selection = "${MediaStore.Video.Media.DISPLAY_NAME} = ?"
+
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } catch (_: Exception) {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
+        } else {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        }
+
+        var index = 1
+        while (index <= 100) {
+            val candidate = "$originalBase-$index.mp4"
+            var exists = false
+
+            try {
+                resolver.query(collection, projection, selection, arrayOf(candidate), null)?.use { cursor ->
+                    exists = cursor.count > 0
+                }
+            } catch (_: Exception) {
+                exists = false
+            }
+
+            if (!exists) {
+                val moviesDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                    "SlimVideo"
+                )
+                if (moviesDir.exists() && File(moviesDir, candidate).exists()) {
+                    exists = true
+                }
+            }
+
+            if (!exists) {
+                return candidate
+            }
+            index++
+        }
+
+        return "$originalBase-$index.mp4"
+    }
 
     /**
      * Save compressed video directly into Android System Gallery / Movies / SlimVideo
@@ -29,10 +77,11 @@ object MediaStoreHelper {
         sourceFile: File,
         baseName: String
     ): Uri = withContext(Dispatchers.IO) {
-        val originalBase = baseName.substringBeforeLast(".").replace(Regex("[/\\\\:*?\"<>|]"), "_").ifBlank { "video" }
-        val uniqueSuffix = (1..99).random()
-        val displayName = "${originalBase}_slim_${uniqueSuffix}.mp4"
+        val originalBase = baseName.substringBeforeLast(".")
+            .replace(Regex("[/\\\\:*?\"<>|]"), "_")
+            .ifBlank { "video" }
 
+        val displayName = resolveUniqueDisplayName(context, originalBase)
         val resolver = context.contentResolver
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

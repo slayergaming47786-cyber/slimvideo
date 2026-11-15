@@ -1,4 +1,4 @@
-# 🎬 SlimVideo (स्लिमवीडियो)
+# 🎬 SlimVideo
 
 <div align="center">
 

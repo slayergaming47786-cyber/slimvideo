@@ -14,7 +14,7 @@
 **Smart, high-performance, 100% on-device video compressor for Android & Web.**  
 Reduces heavy **700+ MB** smartphone camera recordings to **~8–15 MB** (or **~4–5 MB** in Ultra Saver mode) with stunning visual clarity, zero battery drain, and complete privacy.
 
-[📥 Download Latest APK (v2.2.0)](https://github.com/slayergaming47786-cyber/slimvideo/releases/latest) • [✨ Key Features](#-key-features) • [⚙️ Compression Presets](#-compression-presets) • [🏗️ Architecture](#%EF%B8%8F-architecture--tech-stack) • [🚀 Getting Started](#-getting-started)
+[📥 Download Latest APK (v2.3.0)](https://github.com/slayergaming47786-cyber/slimvideo/releases/latest) • [✨ Key Features](#-key-features) • [⚙️ Compression Presets](#-compression-presets) • [🏗️ Architecture](#%EF%B8%8F-architecture--tech-stack) • [🚀 Getting Started](#-getting-started)
 
 </div>
 
@@ -113,11 +113,11 @@ android/app/src/main/
 │   ├── model/
 │   │   └── VideoModels.kt            # Metadata, Presets, Configs, Progress, Results data classes
 │   ├── ui/
-│   │   ├── components/               # Header, Dropzone, VideoInfoCard, CompressionControls, CompressingDialog, ResultCard
+│   │   ├── components/               # Header, Dropzone, VideoInfoCard, CompressionControls, CompressingDialog, ResultCard, BatchReadyCard, BatchCompressingDialog, BatchResultCard
 │   │   └── theme/                    # Deep space dark palette, glowing accents, typography
 │   └── utils/
-│       ├── MediaStoreHelper.kt       # Scoped Storage gallery writer (<original_name>-1.mp4) & FileProvider share
-│       └── VideoAnalyzer.kt          # MediaMetadataRetriever parser & bitrate math engine
+│       ├── MediaStoreHelper.kt       # Scoped Storage gallery writer (<original_name>-1.mp4) & FileProvider / URI share
+│       └── VideoAnalyzer.kt          # MediaMetadataRetriever parser, audio detector & bitrate math engine
 ```
 
 - **Language**: Kotlin 2.0.21

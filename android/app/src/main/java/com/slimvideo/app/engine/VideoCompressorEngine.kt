@@ -83,11 +83,9 @@ class VideoCompressorEngine(private val context: Context) {
         if (tempOutputFile.exists()) tempOutputFile.delete()
 
         try {
-            // 1. Build hardware encoder settings with requested bitrate & Variable Bitrate (VBR)
+            // 1. Build hardware encoder settings with requested bitrate & fallback
             val videoSettings = VideoEncoderSettings.Builder()
                 .setBitrate(config.targetVideoBitrateBps)
-                .setBitrateMode(VideoEncoderSettings.RATE_CONTROL_VBR)
-                .setIFrameIntervalSeconds(2.0f)
                 .build()
 
             val encoderFactory = DefaultEncoderFactory.Builder(context)

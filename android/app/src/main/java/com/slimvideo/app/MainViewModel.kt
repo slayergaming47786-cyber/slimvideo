@@ -235,7 +235,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         totalOriginalBytes = totalOriginalBytes,
                         totalCompressedBytesSoFar = totalCompressedBytesSoFar
                     ),
-                    currentItem = meta
+                    currentMetadata = meta
                 )
 
                 try {
@@ -259,7 +259,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     totalOriginalBytes = totalOriginalBytes,
                                     totalCompressedBytesSoFar = totalCompressedBytesSoFar + itemProgress.currentOutputSizeBytes
                                 ),
-                                currentItem = meta
+                                currentMetadata = meta
                             )
                         }
                     )

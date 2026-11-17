@@ -26,7 +26,6 @@ import com.slimvideo.app.model.CompressionResult
 import com.slimvideo.app.ui.theme.*
 import com.slimvideo.app.utils.MediaStoreHelper
 import com.slimvideo.app.utils.VideoAnalyzer
-import java.io.File
 
 @Composable
 fun ResultCard(
@@ -87,6 +86,11 @@ fun ResultCard(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "${result.codecUsed} • ${result.width}×${result.height} • Hardware VPU Encoded",
+                    color = TextMuted,
+                    fontSize = 11.sp
                 )
             }
 
@@ -188,8 +192,7 @@ fun ResultCard(
                 // Share to WhatsApp / Telegram
                 OutlinedButton(
                     onClick = {
-                        val file = File(result.outputFilePath)
-                        MediaStoreHelper.shareVideo(context, file)
+                        MediaStoreHelper.shareVideoUri(context, result.outputUri)
                     },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
                     border = ButtonDefaults.outlinedButtonBorder.copy(

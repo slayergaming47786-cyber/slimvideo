@@ -41,15 +41,17 @@ Traditional compressors either:
 
 | Feature | Description |
 | :--- | :--- |
-| ⚡ **Hardware Acceleration** | Utilizes hardware MediaCodec (VPU/GPU) for 10x-15x faster encoding with minimum thermal load. |
+| ⚡ **Batch Compression** | Select **15–20+ videos** at once and automatically compress them sequentially with live queue progress. |
+| 🚀 **Hardware Acceleration (VPU/GPU/CPU)** | Utilizes hardware MediaCodec (VPU/GPU) with VBR mode and WakeLock preservation for 15x faster encoding at full silicon capability. |
+| 🎞️ **Next-Gen H.265 (HEVC)** | Support for both H.264 (Universal) and H.265 (HEVC) for 40% additional size savings with dedicated hardware encoders. |
 | 🔒 **100% Offline & Private** | Zero telemetry, zero cloud transfer, zero account requirement. Works in airplane mode. |
 | 📁 **Direct Gallery Auto-Save** | Saves to `Movies/SlimVideo` using Android MediaStore APIs. Automatically indexed for Google Photos & Gallery. |
 | 🏷️ **Clean File Naming** | Preserves original filename: `video00987.mp4` ➔ `video00987-1.mp4` (auto-increments to `-2`, `-3` if already exists). |
-| 📲 **1-Tap WhatsApp Share** | Built-in system share sheet integration to send compressed videos directly to WhatsApp, Telegram, Gmail, etc. |
-| 📥 **Share-To Receiver** | Send any 700+ MB video directly from your phone gallery to SlimVideo using the Android system Share menu. |
+| 📲 **1-Tap WhatsApp Share** | Built-in system share sheet integration to send compressed videos individually or entire batches together. |
+| 📥 **Share-To Receiver (Single & Multiple)** | Send single or multiple videos directly from your phone gallery to SlimVideo using the Android system Share menu. |
 | 🎯 **Target Size Slider** | Set an exact target output size in megabytes (e.g. exactly 10 MB or 15 MB) and the math engine adapts bitrates automatically. |
 | ⚙️ **Full Custom Mode** | Total manual control over Resolution (Original to 480p), Video Bitrate (100–4000 kbps), FPS (24/30/60), and Audio Bitrate. |
-| 📊 **Real-Time Size Estimator** | Instantly calculates expected output size and space saved % as you drag sliders or change presets. |
+| 📊 **Real-Time Size Estimator & Live FPS** | Accurately calculates expected output size, live written bytes counter, and encoding FPS. |
 | 🛡️ **Sensor Track Bypassing** | Automatically strips smartphone camera gyro, sensor telemetry, and vendor tracks to prevent transcode errors. |
 
 ---

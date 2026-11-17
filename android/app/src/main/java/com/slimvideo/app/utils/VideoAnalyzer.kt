@@ -6,32 +6,39 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.slimvideo.app.model.CompressionConfig
 import com.slimvideo.app.model.CompressionPreset
+import com.slimvideo.app.model.VideoCodec
 import com.slimvideo.app.model.VideoMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 object VideoAnalyzer {
 
     fun makeEven(num: Int): Int {
-        return if (num % 2 == 0) num else num - 1
+        val safe = num.coerceAtLeast(16)
+        return if (safe % 2 == 0) safe else safe - 1
     }
 
+    /**
+     * Calculates scaled dimensions maintaining exact aspect ratio,
+     * ensuring dimensions never exceed original and are strictly even.
+     */
     fun calculateScaledDimensions(
         origW: Int,
         origH: Int,
         maxDimension: Int
     ): Pair<Int, Int> {
-        val isPortrait = origH > origW
-        val longSide = if (isPortrait) origH else origW
+        val safeW = origW.coerceAtLeast(16)
+        val safeH = origH.coerceAtLeast(16)
+        val isPortrait = safeH > safeW
+        val longSide = if (isPortrait) safeH else safeW
 
         if (longSide <= maxDimension) {
-            return Pair(makeEven(origW), makeEven(origH))
+            return Pair(makeEven(safeW), makeEven(safeH))
         }
 
         val scale = maxDimension.toFloat() / longSide.toFloat()
-        val scaledW = makeEven((origW * scale).toInt())
-        val scaledH = makeEven((origH * scale).toInt())
+        val scaledW = makeEven((safeW * scale).toInt())
+        val scaledH = makeEven((safeH * scale).toInt())
         return Pair(scaledW, scaledH)
     }
 
@@ -65,7 +72,7 @@ object VideoAnalyzer {
             retriever.setDataSource(context, uri)
 
             val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            val durationMs = durationStr?.toLongOrNull() ?: 1000L
+            val durationMs = (durationStr?.toLongOrNull() ?: 1000L).coerceAtLeast(500L)
 
             val widthStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
             var width = widthStr?.toIntOrNull() ?: 1280
@@ -88,6 +95,14 @@ object VideoAnalyzer {
                 (sizeBytes * 8 * 1000) / durationMs
             } else 0L
 
+            // Check if audio track exists
+            val hasAudioStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
+            val hasAudio = hasAudioStr == null || hasAudioStr.equals("yes", ignoreCase = true)
+
+            // Extract capture frame rate if available
+            val fpsStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)
+            val fps = (fpsStr?.toFloatOrNull()?.toInt() ?: 30).coerceIn(15, 60)
+
             VideoMetadata(
                 uri = uri,
                 name = name,
@@ -96,7 +111,8 @@ object VideoAnalyzer {
                 width = makeEven(width),
                 height = makeEven(height),
                 bitrateBps = bitrateBps,
-                fps = 30
+                fps = fps,
+                hasAudio = hasAudio
             )
         } finally {
             try {
@@ -105,67 +121,83 @@ object VideoAnalyzer {
         }
     }
 
+    /**
+     * Compute optimized compression parameters for a preset
+     */
     fun getPresetConfig(
         meta: VideoMetadata,
         preset: CompressionPreset,
-        targetSizeMB: Int = 10
+        targetSizeMB: Int = 10,
+        codec: VideoCodec = VideoCodec.H264
     ): CompressionConfig {
-        val durationSec = meta.durationSeconds.coerceAtLeast(1L)
-        val isPortrait = meta.isPortrait
+        val durationSec = meta.durationSecondsDouble.coerceAtLeast(1.0)
+        val isHevc = codec == VideoCodec.H265
+        // HEVC gives ~30-40% higher efficiency at the same visual quality
+        val codecFactor = if (isHevc) 0.72f else 1.0f
 
         return when (preset) {
             CompressionPreset.AUTO -> {
-                // ~10-12 MB for 4 min video (crisp 720p HD)
+                // Crisp 720p HD (~10-12 MB for 4 min video)
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, 1280)
+                val baseVideoBps = (320_000 * codecFactor).toInt().coerceAtLeast(100_000)
                 CompressionConfig(
                     preset = CompressionPreset.AUTO,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
-                    targetVideoBitrateBps = 320_000,
-                    targetAudioBitrateBps = 64_000,
+                    targetVideoBitrateBps = baseVideoBps,
+                    targetAudioBitrateBps = if (meta.hasAudio) 64_000 else 0,
                     targetFps = 30
                 )
             }
             CompressionPreset.ULTRA -> {
-                // ~4-5 MB for 4 min video (480p)
+                // 480p SD (~4-5 MB for 4 min video)
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, 854)
+                val baseVideoBps = (140_000 * codecFactor).toInt().coerceAtLeast(80_000)
                 CompressionConfig(
                     preset = CompressionPreset.ULTRA,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
-                    targetVideoBitrateBps = 140_000,
-                    targetAudioBitrateBps = 44_000,
+                    targetVideoBitrateBps = baseVideoBps,
+                    targetAudioBitrateBps = if (meta.hasAudio) 44_000 else 0,
                     targetFps = 24
                 )
             }
             CompressionPreset.BALANCED -> {
-                // ~12-14 MB for 4 min video (720p HD @ 380 kbps)
+                // 720p HD @ 380 kbps (~12-14 MB for 4 min video)
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, 1280)
+                val baseVideoBps = (380_000 * codecFactor).toInt().coerceAtLeast(120_000)
                 CompressionConfig(
                     preset = CompressionPreset.BALANCED,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
-                    targetVideoBitrateBps = 380_000,
-                    targetAudioBitrateBps = 64_000,
+                    targetVideoBitrateBps = baseVideoBps,
+                    targetAudioBitrateBps = if (meta.hasAudio) 64_000 else 0,
                     targetFps = 30
                 )
             }
             CompressionPreset.HIGH -> {
-                // ~28-32 MB for 4 min video (1080p FHD @ 1 Mbps)
+                // 1080p FHD @ 1 Mbps (~28-32 MB for 4 min video)
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, 1920)
+                val baseVideoBps = (1_000_000 * codecFactor).toInt().coerceAtLeast(300_000)
                 CompressionConfig(
                     preset = CompressionPreset.HIGH,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
-                    targetVideoBitrateBps = 1_000_000,
-                    targetAudioBitrateBps = 96_000,
+                    targetVideoBitrateBps = baseVideoBps,
+                    targetAudioBitrateBps = if (meta.hasAudio) 96_000 else 0,
                     targetFps = 30
                 )
             }
             CompressionPreset.TARGET_SIZE -> {
-                val totalBits = targetSizeMB.toLong() * 1024L * 1024L * 8L
+                val totalBits = (targetSizeMB.toDouble() * 1024.0 * 1024.0 * 8.0)
                 val totalBitrate = (totalBits / durationSec).toInt()
-                val audioBitrate = if (totalBitrate > 350_000) 64_000 else 44_000
+                val audioBitrate = if (meta.hasAudio) {
+                    if (totalBitrate > 350_000) 64_000 else 44_000
+                } else 0
                 val videoBitrate = (totalBitrate - audioBitrate).coerceAtLeast(80_000)
 
                 val maxDim = when {
@@ -176,6 +208,7 @@ object VideoAnalyzer {
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, maxDim)
                 CompressionConfig(
                     preset = CompressionPreset.TARGET_SIZE,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
                     targetVideoBitrateBps = videoBitrate,
@@ -188,20 +221,29 @@ object VideoAnalyzer {
                 val (w, h) = calculateScaledDimensions(meta.width, meta.height, 1280)
                 CompressionConfig(
                     preset = CompressionPreset.CUSTOM,
+                    codec = codec,
                     targetWidth = w,
                     targetHeight = h,
-                    targetVideoBitrateBps = 450_000,
-                    targetAudioBitrateBps = 64_000,
+                    targetVideoBitrateBps = (450_000 * codecFactor).toInt(),
+                    targetAudioBitrateBps = if (meta.hasAudio) 64_000 else 0,
                     targetFps = 30
                 )
             }
         }
     }
 
-    fun estimateOutputSizeBytes(config: CompressionConfig, durationSeconds: Long): Long {
+    /**
+     * Highly accurate file size estimation including MP4 container & index table overhead
+     */
+    fun estimateOutputSizeBytes(config: CompressionConfig, durationSecondsDouble: Double): Long {
         val totalBps = config.targetVideoBitrateBps + config.targetAudioBitrateBps
-        val bytes = ((totalBps.toLong() * durationSeconds) / 8L) * 1.02 // 2% container overhead
-        return bytes.toLong()
+        // 2.5% overhead for MP4 container metadata (moov, mvhd, trak, stbl)
+        val bytes = ((totalBps.toDouble() * durationSecondsDouble) / 8.0) * 1.025
+        return bytes.toLong().coerceAtLeast(10_240L)
+    }
+
+    fun estimateOutputSizeBytes(config: CompressionConfig, durationSeconds: Long): Long {
+        return estimateOutputSizeBytes(config, durationSeconds.toDouble())
     }
 
     fun formatBytes(bytes: Long): String {

@@ -37,7 +37,7 @@ object MediaStoreHelper {
         }
 
         var index = 1
-        while (index <= 100) {
+        while (index <= 500) {
             val candidate = "$originalBase-$index.mp4"
             var exists = false
 
@@ -168,7 +168,12 @@ object MediaStoreHelper {
                 "${context.packageName}.fileprovider",
                 videoFile
             )
+            shareVideoUri(context, uri)
+        } catch (_: Exception) {}
+    }
 
+    fun shareVideoUri(context: Context, uri: Uri) {
+        try {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "video/mp4"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -176,6 +181,30 @@ object MediaStoreHelper {
             }
 
             val chooser = Intent.createChooser(shareIntent, "Share Compressed Video")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Share multiple compressed videos at once
+     */
+    fun shareMultipleVideos(context: Context, uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            shareVideoUri(context, uris.first())
+            return
+        }
+
+        try {
+            val uriArrayList = ArrayList(uris)
+            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "video/mp4"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uriArrayList)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            val chooser = Intent.createChooser(shareIntent, "Share Compressed Videos")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
         } catch (_: Exception) {}

@@ -71,6 +71,16 @@ class MainActivity : ComponentActivity() {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM)
             }
             videoUri?.let { viewModel.selectVideo(it) }
+        } else if (Intent.ACTION_SEND_MULTIPLE == action && type.startsWith("video/")) {
+            val videoUris = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+            }
+            if (!videoUris.isNullOrEmpty()) {
+                viewModel.selectVideos(videoUris)
+            }
         }
     }
 }
@@ -106,7 +116,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 when (val currentState = state) {
                     is AppState.Idle -> {
                         Dropzone(
-                            onVideoSelected = { uri -> viewModel.selectVideo(uri) }
+                            onVideoSelected = { uri -> viewModel.selectVideo(uri) },
+                            onBatchSelected = { uris -> viewModel.selectVideos(uris) }
                         )
                     }
 
@@ -127,13 +138,17 @@ fun MainScreen(viewModel: MainViewModel) {
                                     modifier = Modifier.size(48.dp)
                                 )
                                 Text(
-                                    text = "Analyzing Video...",
+                                    text = if (currentState.total > 1) {
+                                        "Analyzing Video ${currentState.current} of ${currentState.total}..."
+                                    } else {
+                                        "Analyzing Video..."
+                                    },
                                     color = TextPrimary,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Reading resolution, bitrate, and audio streams",
+                                    text = "Reading resolution, bitrate, audio tracks & VPU capabilities",
                                     color = TextMuted,
                                     fontSize = 12.sp
                                 )
@@ -141,6 +156,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
 
+                    // Single Video Ready
                     is AppState.Ready -> {
                         VideoInfoCard(
                             metadata = currentState.metadata,
@@ -152,6 +168,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
                     }
 
+                    // Single Video Compressing
                     is AppState.Compressing -> {
                         VideoInfoCard(
                             metadata = currentState.metadata,
@@ -163,9 +180,39 @@ fun MainScreen(viewModel: MainViewModel) {
                         )
                     }
 
+                    // Single Video Completed
                     is AppState.Completed -> {
                         ResultCard(
                             result = currentState.result,
+                            onReset = { viewModel.reset() }
+                        )
+                    }
+
+                    // Batch Videos Ready (2 to 20+ videos)
+                    is AppState.BatchReady -> {
+                        BatchReadyCard(
+                            items = currentState.items,
+                            initialConfig = currentState.config,
+                            onRemoveItem = { index -> viewModel.removeBatchItem(index) },
+                            onAddVideos = { uris -> viewModel.addVideosToBatch(uris) },
+                            onStartBatchCompress = { config -> viewModel.startBatchCompress(config) },
+                            onReset = { viewModel.reset() }
+                        )
+                    }
+
+                    // Batch Videos Compressing
+                    is AppState.BatchCompressing -> {
+                        BatchCompressingDialog(
+                            batchProgress = currentState.batchProgress,
+                            currentItem = currentState.currentMetadata,
+                            onCancel = { viewModel.cancelCompress() }
+                        )
+                    }
+
+                    // Batch Videos Completed
+                    is AppState.BatchCompleted -> {
+                        BatchResultCard(
+                            batchResult = currentState.batchResult,
                             onReset = { viewModel.reset() }
                         )
                     }
@@ -230,7 +277,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "100% Offline • MediaCodec GPU Accelerated • Zero Data Transfer",
+                    text = "100% Offline • MediaCodec GPU/VPU Turbo • Zero Data Transfer",
                     color = TextMuted,
                     fontSize = 10.sp,
                     textAlign = TextAlign.Center

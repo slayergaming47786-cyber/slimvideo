@@ -11,7 +11,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
@@ -34,12 +37,27 @@ import com.slimvideo.app.ui.theme.*
 @Composable
 fun Dropzone(
     onVideoSelected: (Uri) -> Unit,
+    onBatchSelected: (List<Uri>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val launcher = rememberLauncherForActivityResult(
+    // Single Video Picker
+    val singlePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { onVideoSelected(it) }
+    }
+
+    // Multiple Videos Picker (Batch: 1 to 20+ videos)
+    val multiplePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            if (uris.size == 1) {
+                onVideoSelected(uris.first())
+            } else {
+                onBatchSelected(uris)
+            }
+        }
     }
 
     Column(
@@ -49,7 +67,7 @@ fun Dropzone(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Main Clickable Picker Card
+        // Main Interactive Card: Batch & Single Picker
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -58,12 +76,11 @@ fun Dropzone(
                 .border(
                     width = 1.5.dp,
                     brush = Brush.verticalGradient(
-                        listOf(CyanAccent.copy(alpha = 0.4f), PurpleAccent.copy(alpha = 0.2f))
+                        listOf(CyanAccent.copy(alpha = 0.5f), PurpleAccent.copy(alpha = 0.25f))
                     ),
                     shape = RoundedCornerShape(20.dp)
                 )
-                .clickable { launcher.launch("video/*") }
-                .padding(vertical = 36.dp, horizontal = 20.dp),
+                .padding(vertical = 30.dp, horizontal = 20.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -77,17 +94,17 @@ fun Dropzone(
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                listOf(CyanAccent.copy(alpha = 0.2f), PurpleAccent.copy(alpha = 0.2f))
+                                listOf(CyanAccent.copy(alpha = 0.25f), PurpleAccent.copy(alpha = 0.25f))
                             )
                         )
-                        .border(1.dp, CyanAccent.copy(alpha = 0.5f), CircleShape),
+                        .border(1.2.dp, CyanAccent.copy(alpha = 0.6f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.VideoLibrary,
                         contentDescription = null,
                         tint = CyanAccent,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(34.dp)
                     )
                 }
 
@@ -96,14 +113,14 @@ fun Dropzone(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "Select Video to Compress",
+                        text = "Hardware Accelerated Compressor",
                         color = TextPrimary,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "Tap to choose from Gallery, Files, or Google Drive",
+                        text = "100% On-Device • Snapdragon / Exynos / MediaTek VPU",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
@@ -113,52 +130,81 @@ fun Dropzone(
                 // Feature Tags
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    FeaturePill("4K / 1080p")
-                    FeaturePill("Any Size (Up to 2+ GB)")
-                    FeaturePill("MP4 • MOV • MKV")
+                    FeaturePill("Batch 15-20+ Videos")
+                    FeaturePill("H.264 & H.265")
+                    FeaturePill("Up to 2+ GB")
                 }
 
-                // CTA Button
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Primary CTA: Batch Compress (Select 15-20+ Videos)
                 Button(
-                    onClick = { launcher.launch("video/*") },
+                    onClick = { multiplePickerLauncher.launch("video/*") },
                     colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .padding(top = 10.dp)
+                        .fillMaxWidth(0.92f)
+                        .height(50.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Layers,
+                        contentDescription = null,
+                        tint = DarkBackground,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "⚡ Batch Compress (Select Multiple)",
+                        color = DarkBackground,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                // Secondary CTA: Single Video
+                OutlinedButton(
+                    onClick = { singlePickerLauncher.launch("video/*") },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = Brush.horizontalGradient(listOf(CyanAccent.copy(alpha = 0.6f), PurpleAccent.copy(alpha = 0.6f)))
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .height(46.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
-                        tint = DarkBackground,
+                        tint = CyanAccent,
                         modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Choose from Gallery",
-                        color = DarkBackground,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        text = "Select Single Video",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
                     )
                 }
             }
         }
 
-        // Feature highlight boxes
+        // Hardware Capability & Privacy highlights
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             InfoBox(
-                title = "⚡ GPU MediaCodec",
-                description = "Maximum hardware speed without phone lag",
+                title = "⚡ GPU/VPU Boost",
+                description = "Runs at maximum clock speeds for fast 15-20 batch jobs",
                 modifier = Modifier.weight(1f)
             )
             InfoBox(
-                title = "🔒 100% On-Device",
-                description = "Zero data sent to internet. Total privacy.",
+                title = "🔒 100% Offline",
+                description = "Zero bytes leave your phone. Total security & privacy",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -188,7 +234,7 @@ private fun InfoBox(title: String, description: String, modifier: Modifier = Mod
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface.copy(alpha = 0.6f))
+            .background(DarkSurface.copy(alpha = 0.7f))
             .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
             .padding(12.dp)
     ) {

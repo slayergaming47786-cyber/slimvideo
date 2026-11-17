@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material3.*
@@ -25,13 +26,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.slimvideo.app.model.CompressionProgress
 import com.slimvideo.app.ui.theme.*
+import com.slimvideo.app.utils.VideoAnalyzer
 
 @Composable
 fun CompressingDialog(
     progress: CompressionProgress,
     onCancel: () -> Unit
 ) {
-    // Subtle pulsing animation for hardware chip icon
+    // Pulsing animation for hardware chip icon
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -124,19 +126,35 @@ fun CompressingDialog(
                     trackColor = DarkSurfaceVariant
                 )
 
-                // Stats Grid (Speed, ETA, Elapsed)
+                // Live Size Counter
+                if (progress.currentOutputSizeBytes > 0) {
+                    Text(
+                        text = "Current Written: ${VideoAnalyzer.formatBytes(progress.currentOutputSizeBytes)}",
+                        color = EmeraldGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Stats Grid (Speed, FPS, Time Left, Elapsed)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(DarkSurfaceVariant)
-                        .padding(12.dp),
+                        .padding(10.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     StatItem(
                         label = "Speed",
                         value = "${progress.speedMultiplier}x"
                     )
+                    if (progress.encodingFps > 0) {
+                        StatItem(
+                            label = "FPS",
+                            value = "${progress.encodingFps.toInt()}"
+                        )
+                    }
                     StatItem(
                         label = "Time Left",
                         value = formatSeconds(progress.etaSeconds)

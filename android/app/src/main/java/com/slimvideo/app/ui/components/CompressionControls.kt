@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.slimvideo.app.model.CompressionConfig
 import com.slimvideo.app.model.CompressionPreset
+import com.slimvideo.app.model.VideoCodec
 import com.slimvideo.app.model.VideoMetadata
 import com.slimvideo.app.ui.theme.*
 import com.slimvideo.app.utils.VideoAnalyzer
@@ -35,6 +36,7 @@ fun CompressionControls(
     modifier: Modifier = Modifier
 ) {
     var selectedPreset by remember { mutableStateOf(CompressionPreset.AUTO) }
+    var selectedCodec by remember { mutableStateOf(VideoCodec.H264) }
     var targetSizeMB by remember { mutableFloatStateOf(10f) }
 
     // Custom Mode states
@@ -46,6 +48,7 @@ fun CompressionControls(
     val config = remember(
         metadata,
         selectedPreset,
+        selectedCodec,
         targetSizeMB,
         customMaxDim,
         customVideoBitrateKbps,
@@ -60,19 +63,20 @@ fun CompressionControls(
             }
             CompressionConfig(
                 preset = CompressionPreset.CUSTOM,
+                codec = selectedCodec,
                 targetWidth = w,
                 targetHeight = h,
                 targetVideoBitrateBps = (customVideoBitrateKbps * 1000).toInt(),
-                targetAudioBitrateBps = customAudioBitrateKbps * 1000,
+                targetAudioBitrateBps = if (metadata.hasAudio) customAudioBitrateKbps * 1000 else 0,
                 targetFps = customFps
             )
         } else {
-            VideoAnalyzer.getPresetConfig(metadata, selectedPreset, targetSizeMB.toInt())
+            VideoAnalyzer.getPresetConfig(metadata, selectedPreset, targetSizeMB.toInt(), selectedCodec)
         }
     }
 
     val estimatedBytes = remember(config, metadata) {
-        VideoAnalyzer.estimateOutputSizeBytes(config, metadata.durationSeconds)
+        VideoAnalyzer.estimateOutputSizeBytes(config, metadata.durationSecondsDouble)
     }
 
     val savedBytes = (metadata.sizeBytes - estimatedBytes).coerceAtLeast(0L)
@@ -84,6 +88,38 @@ fun CompressionControls(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Codec Selector Header
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "Hardware Video Codec",
+                color = TextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 2.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CodecPill(
+                    title = "H.264 (AVC)",
+                    subtitle = "Universal Compatibility",
+                    isSelected = selectedCodec == VideoCodec.H264,
+                    onClick = { selectedCodec = VideoCodec.H264 },
+                    modifier = Modifier.weight(1f)
+                )
+
+                CodecPill(
+                    title = "H.265 (HEVC)",
+                    subtitle = "40% Smaller & VPU Boost",
+                    isSelected = selectedCodec == VideoCodec.H265,
+                    onClick = { selectedCodec = VideoCodec.H265 },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
         Text(
             text = "Select Compression Preset",
             color = TextSecondary,
@@ -143,17 +179,17 @@ fun CompressionControls(
             )
         }
 
-        // Target Size Slider (Only shown when Target Size is selected)
+        // Sub-controls for TARGET_SIZE
         if (selectedPreset == CompressionPreset.TARGET_SIZE) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(DarkSurfaceVariant)
-                    .border(1.dp, BorderColor, RoundedCornerShape(14.dp))
+                    .border(1.dp, CyanAccent.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                     .padding(14.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -163,12 +199,12 @@ fun CompressionControls(
                             text = "Target Output Size",
                             color = TextPrimary,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = "${targetSizeMB.toInt()} MB",
                             color = CyanAccent,
-                            fontSize = 15.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -176,8 +212,8 @@ fun CompressionControls(
                     Slider(
                         value = targetSizeMB,
                         onValueChange = { targetSizeMB = it },
-                        valueRange = 4f..100f,
-                        steps = 95,
+                        valueRange = 3f..50f,
+                        steps = 47,
                         colors = SliderDefaults.colors(
                             thumbColor = CyanAccent,
                             activeTrackColor = CyanAccent,
@@ -189,14 +225,14 @@ fun CompressionControls(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "4 MB (WhatsApp min)", color = TextMuted, fontSize = 10.sp)
-                        Text(text = "100 MB", color = TextMuted, fontSize = 10.sp)
+                        Text(text = "3 MB (Ultra small)", color = TextMuted, fontSize = 10.sp)
+                        Text(text = "50 MB (Email / Discord)", color = TextMuted, fontSize = 10.sp)
                     }
                 }
             }
         }
 
-        // Custom Settings Panel (Only shown when Custom is selected)
+        // Sub-controls for CUSTOM
         if (selectedPreset == CompressionPreset.CUSTOM) {
             Box(
                 modifier = Modifier
@@ -207,7 +243,6 @@ fun CompressionControls(
                     .padding(14.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    // Header
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -345,36 +380,38 @@ fun CompressionControls(
                     }
 
                     // 4. Audio Quality
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(text = "Audio Quality", color = TextSecondary, fontSize = 12.sp)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FpsChip(
-                                label = "48 kbps",
-                                isSelected = customAudioBitrateKbps == 48,
-                                onClick = { customAudioBitrateKbps = 48 },
-                                modifier = Modifier.weight(1f)
-                            )
-                            FpsChip(
-                                label = "64 kbps",
-                                isSelected = customAudioBitrateKbps == 64,
-                                onClick = { customAudioBitrateKbps = 64 },
-                                modifier = Modifier.weight(1f)
-                            )
-                            FpsChip(
-                                label = "96 kbps",
-                                isSelected = customAudioBitrateKbps == 96,
-                                onClick = { customAudioBitrateKbps = 96 },
-                                modifier = Modifier.weight(1f)
-                            )
-                            FpsChip(
-                                label = "128 kbps",
-                                isSelected = customAudioBitrateKbps == 128,
-                                onClick = { customAudioBitrateKbps = 128 },
-                                modifier = Modifier.weight(1f)
-                            )
+                    if (metadata.hasAudio) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(text = "Audio Quality", color = TextSecondary, fontSize = 12.sp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FpsChip(
+                                    label = "48 kbps",
+                                    isSelected = customAudioBitrateKbps == 48,
+                                    onClick = { customAudioBitrateKbps = 48 },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FpsChip(
+                                    label = "64 kbps",
+                                    isSelected = customAudioBitrateKbps == 64,
+                                    onClick = { customAudioBitrateKbps = 64 },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FpsChip(
+                                    label = "96 kbps",
+                                    isSelected = customAudioBitrateKbps == 96,
+                                    onClick = { customAudioBitrateKbps = 96 },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FpsChip(
+                                    label = "128 kbps",
+                                    isSelected = customAudioBitrateKbps == 128,
+                                    onClick = { customAudioBitrateKbps = 128 },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 }
@@ -397,7 +434,7 @@ fun CompressionControls(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Estimated Output",
+                        text = "Estimated Output (${config.codec.shortName})",
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
@@ -468,12 +505,61 @@ fun CompressionControls(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Compress Video (Hardware Accelerated)",
+                    text = "Compress Video (${config.codec.shortName} VPU)",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CodecPill(
+    title: String,
+    subtitle: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) DarkSurfaceVariant else DarkSurface)
+            .border(
+                1.5.dp,
+                if (isSelected) CyanAccent else BorderColor,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = if (isSelected) CyanAccent else TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = CyanAccent,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            Text(
+                text = subtitle,
+                color = TextMuted,
+                fontSize = 10.sp
+            )
         }
     }
 }
